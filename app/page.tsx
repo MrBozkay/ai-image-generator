@@ -5,30 +5,42 @@ import { PromptForm } from './components/PromptForm'
 import { ImageGallery } from './components/ImageGallery'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import { Notifications, useToast } from './components/Notifications'
+import { Button } from "@/components/ui/button"
 
 type ImageData = {
   id: string
   imageUrl: string
   prompt: string
+  filename: string
 }
 
 export default function Home() {
+  
   const [images, setImages] = useState<ImageData[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [nextLastId, setNextLastId] = useState<string | null>(null)
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number>(6)
   const { toast } = useToast()
 
   useEffect(() => {
     fetchHistory()
   }, [])
 
-  const fetchHistory = async () => {
+  const fetchHistory = async ( lastId?: string ) => {
     try {
-      const response = await fetch('/api/history?limit=10')
-      console.log("response : /n", response)  
+      const url = new URL('/api/history', window.location.origin)
+      url.searchParams.append('limit', selectedImageIndex.toString())
+      if (lastId) url.searchParams.append('lastId', lastId)
+
+      const response = await fetch(url)
+      console.log("response history api : /n", response)  
       if (!response.ok) throw new Error('Failed to fetch history')
       const data = await response.json()
+      console.log("data from history api : /n", data)
       
-      setImages(data)
+      setImages(prevImages => lastId ? [...prevImages, ...data.history] : data.history)
+      console.log("images from history api : /n", images)
+      setNextLastId(data.nextLastId)
     } catch (error) {
       console.error('Error fetching history:', error)
       toast({
@@ -42,16 +54,16 @@ export default function Home() {
   const handleSubmit = async (prompt: string) => {
     setIsLoading(true)
     try {
-      const response = await fetch('/api/generate', {
+
+      const gen_url = new URL('/api/generate', window.location.origin)
+      const response = await fetch(gen_url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          
         },
         body: JSON.stringify({ prompt }),
       })
-
-      // check response 
-      //console.log("response : /n",response)
 
       if (!response.ok) {
         const errorData = await response.json()
@@ -59,9 +71,9 @@ export default function Home() {
       }
 
       const newImage: ImageData = await response.json()
-      console.log("newImage : /n", newImage)
+      console.log("newImage from generate api : /n", newImage)
       setImages(prevImages => [newImage, ...prevImages])
-      console.log("images : /n", images)
+      console.log("images from generate api : /n", images)
       toast({
         title: "Image generated successfully",
         description: "Your image has been created and added to the gallery.",
@@ -78,12 +90,48 @@ export default function Home() {
     }
   }
 
+  const handleDeleteImage = async (id: string) => {
+    try {
+      const del_url = new URL('/api/delete-image', window.location.origin)
+      const response = await fetch(del_url, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id }),
+        
+      })
+      console.log(" deleted image : " , id)
+
+      if (!response.ok) {
+        throw new Error('Failed to delete image')
+      }
+
+      setImages(prevImages => prevImages.filter(image => image.id !== id))
+      toast({
+        title: "Image deleted successfully",
+        description: "The image has been removed from your gallery.",
+      })
+    } catch (error) {
+      console.error('Error deleting image:', error)
+      toast({
+        variant: "destructive",
+        title: "Error deleting image",
+        description: "There was a problem deleting the image. Please try again.",
+      })
+    }
+  }
+
+
   return (
     <div className="space-y-8">
       <h1 className="text-3xl font-bold">AI Image Generator</h1>
       <PromptForm onSubmit={handleSubmit} />
       {isLoading && <LoadingSpinner />}
-      <ImageGallery images={images} />
+      <ImageGallery images={images} onDelete={handleDeleteImage} />
+      {nextLastId && (
+        <Button onClick={() => fetchHistory(nextLastId)}>Load More</Button>
+      )}
       <Notifications />
     </div>
   )
