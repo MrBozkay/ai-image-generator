@@ -5,23 +5,13 @@ import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/app/lib/firebase';
 import { rateLimiter } from '@/app/lib/rateLimit';
 import { errorHandler } from '@/app/lib/errorHandler';
-// Create huggingface models list
-const models: { [key: string]: string } = {
-
-  'stable-diffusion-v2' :'stabilityai/stable-diffusion-2',
-  'flux.1-lite-8b' : 'Freepik/flux.1-lite-8B-alpha',
-  'FLUX.1-dev' : 'black-forest-labs/FLUX.1-dev',
-  'stable-diffusion-3.5-large' : 'stabilityai/stable-diffusion-3.5-large',
-  'stable-diffusion-3.5-large-turbo' : 'stabilityai/stable-diffusion-3.5-large-turbo',
-}
-
+import { models } from '@/app/lib/models';
 
 // Create HuggingFace inference instance
 const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
 
 export async function POST(req: Request) {
   try {
-    // Validate API key exists
     if (!process.env.HUGGINGFACE_API_KEY) {
       console.error('HUGGINGFACE_API_KEY is not set');
       return NextResponse.json(
@@ -33,7 +23,7 @@ export async function POST(req: Request) {
     const rateLimitResult = rateLimiter(ip);
 
     if (rateLimitResult) {
-        return rateLimitResult;
+      return rateLimitResult;
     }
 
     const { prompt } = await req.json();
@@ -43,14 +33,16 @@ export async function POST(req: Request) {
     }
 
     console.log('Prompt:', prompt);
-    console.log('Using model:',models["stable-diffusion-3.5-large-turbo"]);
+    console.log('Using model:', models["stable-diffusion-3.5-large-turbo"]);
 
     // Generate image using Hugging Face
     const response = await hf.textToImage({
       model: models["stable-diffusion-3.5-large-turbo"],
       inputs: prompt,
       parameters: {
-        negative_prompt: 'blurry, bad quality, low resolution',
+        negative_prompt: 'blurry, bad quality, distorted',
+        num_inference_steps: 50,
+        guidance_scale: 7.5,
       },
     });
 
@@ -63,8 +55,8 @@ export async function POST(req: Request) {
     const base64 = Buffer.from(buffer).toString('base64');
     const dataUrl = `data:image/jpeg;base64,${base64}`;
 
-    /// Generate a unique filename
-    const filename = `${Date.now()}.jpg`;
+    // Generate a unique filename
+    const filename = `image-${Date.now()}.jpg`;
 
     // Upload image to Firebase Storage
     const storageRef = ref(storage, `images/${filename}`);
@@ -80,13 +72,18 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({
-        id: docRef.id, 
-        imageUrl,
-        prompt,
-        filename });
-
+      id: docRef.id,
+      imageUrl,
+      prompt,
+      filename
+    });
   } catch (error) {
     console.error('Error generating image:', error);
-    errorHandler(error)
+    return errorHandler(error);
   }
+}
+
+// Add this OPTIONS handler
+export async function OPTIONS(req: Request) {
+  return new NextResponse(null, { status: 200 });
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { PromptForm } from './components/PromptForm'
+import { ImageGenerationForm } from './components/ImageGenerationForm'
 import { ImageGallery } from './components/ImageGallery'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import { Notifications, useToast } from './components/Notifications'
@@ -12,6 +13,13 @@ type ImageData = {
   imageUrl: string
   prompt: string
   filename: string
+}
+
+type GenerationParams = {
+  prompt: string;
+  negativePrompt: string;
+  numInferenceSteps: number;
+  guidanceScale: number;
 }
 
 export default function Home() {
@@ -51,7 +59,7 @@ export default function Home() {
     }
   }
 
-  const handleSubmit = async (prompt: string) => {
+const handleSubmit = async (params: GenerationParams) => {
     setIsLoading(true)
     try {
 
@@ -60,9 +68,8 @@ export default function Home() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          
         },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify(params),
       })
 
       if (!response.ok) {
@@ -126,7 +133,8 @@ export default function Home() {
   return (
     <div className="space-y-8">
       <h1 className="text-3xl font-bold">AI Image Generator</h1>
-      <PromptForm onSubmit={handleSubmit} />
+      {/* <PromptForm onSubmit={handleSubmit} /> */}
+      <ImageGenerationForm onSubmit={handleSubmit} />
       {isLoading && <LoadingSpinner />}
       <ImageGallery images={images} onDelete={handleDeleteImage} />
       {nextLastId && (

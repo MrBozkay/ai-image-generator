@@ -4,6 +4,7 @@ import { Trash2 } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { ImageModal } from './ImageModal'
 import { useState } from 'react';
+// import { useNonce } from "../utils/useNonce.ts"
 
 type ImageData = {
   id: string
@@ -14,6 +15,16 @@ type ImageData = {
 
 export function ImageGallery({ images, onDelete }: { images: ImageData[], onDelete: (id: string) => void }) {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+ // const nonce = useNonce()
+
+/*   useEffect(() => {
+    if (nonce) {
+      const script = document.createElement('script')
+      script.nonce = nonce
+      script.textContent = 'console.log("Dynamic script with nonce")'
+      document.body.appendChild(script)
+    }
+  }, [nonce]) */
 
   const handleImageClick = (index: number) => {
     setSelectedImageIndex(index);

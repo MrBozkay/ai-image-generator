@@ -29,14 +29,20 @@ export async function GET(req: Request) {
       createdAt: doc.data().createdAt.toDate().toISOString(),
     }));
 
-    const lastVisible = querySnapshot.docs[querySnapshot.docs.length -1];
+    const lastVisible = querySnapshot.docs[querySnapshot.docs.length - 1];
     const lastId = lastVisible ? lastVisible.id : null;
-    console.log("history : /n",history)
-    console.log("lastId : /n", lastId)   
-    return NextResponse.json({ history, lastId })
+
+    console.log("history:", history);
+    console.log("lastId:", lastId);   
+    return NextResponse.json({ history, lastId });
 
   } catch (error) {
     console.error('Error fetching history:', error);
-    errorHandler(error);
+    return errorHandler(error);
   }
+}
+
+// Add this OPTIONS handler
+export async function OPTIONS(req: Request) {
+  return new NextResponse(null, { status: 200 });
 }
