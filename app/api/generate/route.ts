@@ -6,10 +6,11 @@ import { db, storage } from '@/app/lib/firebase';
 import { rateLimiter } from '@/app/lib/rateLimit';
 import { errorHandler } from '@/app/lib/errorHandler';
 import { models } from '@/app/lib/models';
-import { getCachedImage, setCachedImage } from '@/app/lib/cache';
+
 
 // Create HuggingFace inference instance
-const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
+// const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
+const used_model=models["f.1-dev"]
 
 export async function POST(req: Request) {
 
@@ -35,34 +36,34 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid prompt' }, { status: 400 });
     }
     console.log('Prompt:', prompt);
-    console.log('Using model:', models["stable-diffusion-3.5-large-turbo"]);
+    console.log('Using model:', used_model);
 
-    const cacheKey = `${prompt}-${negativePrompt}-${numInferenceSteps}-${guidanceScale}`;
-    const cachedImageUrl = getCachedImage(cacheKey);
-
-    if (cachedImageUrl) {
-      return NextResponse.json({ imageUrl: cachedImageUrl, prompt });
-    }
+ 
     
     // Generate image using Hugging Face
-    const response = await hf.textToImage({
-      model: models["stable-diffusion-3.5-large-turbo"],
-      inputs: prompt,
-      parameters: {
-        negative_prompt : negativePrompt,
-        num_inference_steps: numInferenceSteps,
-        guidance_scale: guidanceScale
+    const response = await fetch("https://api-inference.huggingface.co/models/"+used_model, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        inputs: prompt,
+        num_inference_steps: numInferenceSteps,
+        negative_prompt: negativePrompt,
+        guidance_scale: guidanceScale,
+      }),
     });
 
-    if (!response) {
+    if (!response.ok) {
       throw new Error('Failed to generate image - no response from API');
     }
-
-    // Convert blob to base64
-    const buffer = await response.arrayBuffer();
+    // convert img data
+    const result = await response.blob();
+    const buffer = await result.arrayBuffer();
     const base64 = Buffer.from(buffer).toString('base64');
     const dataUrl = `data:image/jpeg;base64,${base64}`;
+    
     // Generate a unique filename
     const filename = `image-${Date.now()}.jpg`;
     // Upload image to Firebase Storage
@@ -77,9 +78,6 @@ export async function POST(req: Request) {
       filename,
       createdAt: serverTimestamp(),
     });
-
-    // Cache the result
-    setCachedImage(cacheKey, imageUrl);
 
     return NextResponse.json({
       id: docRef.id,
