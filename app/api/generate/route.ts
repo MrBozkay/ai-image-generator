@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { HfInference } from '@huggingface/inference';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/app/lib/firebase';
@@ -8,8 +7,8 @@ import { errorHandler } from '@/app/lib/errorHandler';
 import { models } from '@/app/lib/models';
 
 
-// Create HuggingFace inference instance
-// const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
+// Create HuggingFace  token
+const hf_token = process.env.HUGGINGFACE_API_KEY;
 const used_model=models["f.1-dev"]
 
 export async function POST(req: Request) {
@@ -44,7 +43,7 @@ export async function POST(req: Request) {
     const response = await fetch("https://api-inference.huggingface.co/models/"+used_model, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
+        'Authorization': `Bearer ${hf_token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
