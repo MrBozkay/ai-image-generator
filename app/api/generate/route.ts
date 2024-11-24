@@ -9,7 +9,6 @@ import { models } from '@/app/lib/models';
 
 // Create HuggingFace  token
 const hf_token = process.env.HUGGINGFACE_API_KEY;
-const used_model=models["f.1-dev"]
 
 export async function POST(req: Request) {
 
@@ -29,18 +28,18 @@ export async function POST(req: Request) {
 
   try {
 
-    const { prompt, negativePrompt, numInferenceSteps, guidanceScale } = await req.json();
+    const { prompt, negativePrompt, numInferenceSteps, guidanceScale, model } = await req.json();
 
     if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json({ error: 'Invalid prompt' }, { status: 400 });
     }
     console.log('Prompt:', prompt);
-    console.log('Using model:', used_model);
 
- 
+    // Find the selected model from the models array
+    const selectedModel = models.find(m => m.id === model)?.name || models[0].name;
     
-    // Generate image using Hugging Face
-    const response = await fetch("https://api-inference.huggingface.co/models/"+used_model, {
+    // Generate image using Hugging Face with selected model
+    const response = await fetch(`https://api-inference.huggingface.co/models/${selectedModel}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${hf_token}`,

@@ -7,6 +7,10 @@ import { ImageGallery } from './components/ImageGallery'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import { Notifications, useToast } from './components/Notifications'
 import { Button } from "@/components/ui/button"
+import { initializeModels } from "@/app/lib/models"
+
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Sidebar } from './components/Sidebar'
 
 type ImageData = {
   id: string
@@ -22,48 +26,42 @@ type GenerationParams = {
   guidanceScale: number;
 }
 
+type Model = {
+  id: string;
+  name: string;
+}
+
 export default function Home() {
   
   const [images, setImages] = useState<ImageData[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingMore,setIsLoadingMore] = useState(false)
   const [nextLastId, setNextLastId] = useState<string | null>(null)
-  const [selectedImageIndex, setSelectedImageIndex] = useState<number>(6)
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number>(15)
   const { toast } = useToast()
+  const [allImages, setAllImages] = useState<ImageData[]>([])
+  const [displayCount, setDisplayCount] = useState<number>(15)
+  const [selectedModel, setSelectedModel] = useState<string>("default")
+  const [selectedPrompt, setSelectedPrompt] = useState<string>("")
 
   useEffect(() => {
-    fetchHistory()
+    fetchAllImages()
+    initializeModels()
   }, [])
 
-  const fetchHistory = async (lastId?: string) => {
-    try {
-      console.log('Fetching history with lastId:', lastId)
-      console.log('Current images:', images)
-      
-      const url = new URL('/api/history', window.location.origin)
-      url.searchParams.append('limit', selectedImageIndex.toString())
-      if (lastId) url.searchParams.append('lastId', lastId)
-      
-      console.log('Fetching from URL:', url.toString())
+  useEffect(() => {
+    setImages(allImages.slice(0, displayCount))
+  }, [allImages, displayCount])
 
+  const fetchAllImages = async () => {
+    try {
+      const url = new URL('/api/history', window.location.origin)
       const response = await fetch(url)
       if (!response.ok) throw new Error('Failed to fetch history')
       const data = await response.json()
       
-      console.log('Received data:', data)
-      console.log('Received lastId:', data.lastId)
-      console.log('Received history length:', data.history.length)
-      
-      setImages(prevImages => {
-        const newImages = lastId ? [...prevImages, ...data.history] : data.history
-        console.log('Updated images array:', newImages)
-        return newImages
-      })
-      
-      const newNextLastId = data.history.length > 0 ? data.lastId : null
-      console.log('Setting nextLastId to:', newNextLastId)
-      setNextLastId(newNextLastId)
-      
+      setAllImages(data.history)
+      setImages(data.history.slice(0, displayCount))
     } catch (error) {
       console.error('Error fetching history:', error)
       toast({
@@ -74,7 +72,7 @@ export default function Home() {
     }
   }
 
-const handleSubmit = async (params: GenerationParams) => {
+  const handleSubmit = async (params: GenerationParams) => {
     setIsLoading(true)
     try {
 
@@ -94,7 +92,8 @@ const handleSubmit = async (params: GenerationParams) => {
 
       const newImage: ImageData = await response.json()
       console.log("newImage from generate api : /n", newImage)
-      setImages(prevImages => [newImage, ...prevImages])
+      setAllImages(prev => [newImage, ...prev])
+      setImages(prev => [newImage, ...prev].slice(0, displayCount))
       console.log("images from generate api : /n", images)
       toast({
         title: "Image generated successfully",
@@ -129,7 +128,8 @@ const handleSubmit = async (params: GenerationParams) => {
         throw new Error('Failed to delete image')
       }
 
-      setImages(prevImages => prevImages.filter(image => image.id !== id))
+      setAllImages(prev => prev.filter(image => image.id !== id))
+      setImages(prev => prev.filter(image => image.id !== id))
       toast({
         title: "Image deleted successfully",
         description: "The image has been removed from your gallery.",
@@ -146,50 +146,84 @@ const handleSubmit = async (params: GenerationParams) => {
 
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-3xl font-bold">AI Image Generator</h1>
-      {/* <PromptForm onSubmit={handleSubmit} /> */}
-      <ImageGenerationForm onSubmit={handleSubmit} />
-      {isLoading && <LoadingSpinner />}
-      <ImageGallery images={images} onDelete={handleDeleteImage} />
-      <div className="flex justify-center">
+    <div className="flex">
+      <Sidebar 
+        selectedModel={selectedModel}
+        onModelSelect={setSelectedModel}
+        promptHistory={allImages.map(img => img.prompt)}
+        onPromptSelect={setSelectedPrompt}
+      />
+      
+      <div className="flex-1 p-8 space-y-8">
         
-      {images.length === 0 && !isLoading && (
-        <div className="text-center text-gray-500">
-          <p>No images generated yet.</p>
+        <ImageGenerationForm 
+          onSubmit={handleSubmit} 
+          selectedModel={selectedModel}
+          selectedPrompt={selectedPrompt}
+        />
+        
+        <div className="flex justify-end mb-4">
+          <Select
+            value={displayCount.toString()}
+            onValueChange={(value) => setDisplayCount(Number(value))}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Images to display" />
+            </SelectTrigger>
+            <SelectContent>
+              {[6, 15, 30, 50].map(num => (
+                <SelectItem key={num} value={num.toString()}>
+                  Show {num} images
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      )}
-      {images.length > 0 && nextLastId === null && (
-        <div className="text-center text-gray-500">
-          <p>No more images to load.</p>
-        </div>
-      )}
 
-      {nextLastId && images.length > 0 && (
-        <Button 
-          onClick={() => {
-            fetchHistory(nextLastId);
-            setIsLoadingMore(true);
-          }}
-          className={`w-1/4 justify-center items-center bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ${isLoadingMore ? 'hidden' : ''}`}
-        >
-          Load More Images
-        </Button>
-      )}
-      {isLoadingMore && (
-        <Button 
-          onClick={() => {
-            setIsLoadingMore(false);
-            fetchHistory()
-            
-          }}
-          className="w-1/4 justify-center items-center bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
-        >
-          Load Less
-        </Button>
-      )}
+        {isLoading && <LoadingSpinner />}
+        <ImageGallery images={images} onDelete={handleDeleteImage} />
+        
+        <div className="flex justify-center">
+        
+        {images.length === 0 && !isLoading && (
+          <div className="text-center text-gray-500">
+            <p>No images generated yet.</p>
+          </div>
+        )}
+        {images.length > 0 && nextLastId === null && (
+          <div className="text-center text-gray-500">
+            <p>No more images to load.</p>
+          </div>
+        )}
+
+        {nextLastId && images.length > 0 && (
+          <Button 
+            onClick={() => {
+              setSelectedImageIndex(images.length)
+              fetchHistory();
+              setIsLoadingMore(true);
+            }}
+            className={`w-1/4 justify-center items-center bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ${isLoadingMore ? 'hidden' : ''}`}
+          >
+            Load More Images
+          </Button>
+        )}
+        {isLoadingMore && (
+          <Button 
+            onClick={() => {
+              setIsLoadingMore(false);
+              setSelectedImageIndex(6)
+              fetchHistory()
+              
+            }}
+            className="w-1/4 justify-center items-center bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+          >
+            Load Less
+          </Button>
+        )}
+        </div>
+        <Notifications />
       </div>
-      <Notifications />
     </div>
   )
 }

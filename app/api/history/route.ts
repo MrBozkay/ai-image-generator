@@ -32,8 +32,8 @@ export async function GET(req: Request) {
     const lastVisible = querySnapshot.docs[querySnapshot.docs.length - 1];
     const lastId = lastVisible ? lastVisible.id : null;
 
-    console.log("history:", history);
-    console.log("lastId:", lastId);   
+    // console.log("history:", history);
+    // console.log("lastId:", lastId);   
     return NextResponse.json({ history, lastId });
 
   } catch (error) {

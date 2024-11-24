@@ -9,10 +9,13 @@ const firebaseConfig = {
   storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.FIREBASE_APP_ID,
+  measurementId: process.env.FIREBASE_MEASUREMENT_ID
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+console.log('Firebase app initialized:', app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-export { app, db, storage };
+
+export { app, db, storage  } ;
